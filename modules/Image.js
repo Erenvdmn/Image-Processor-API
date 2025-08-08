@@ -11,7 +11,7 @@ const imageSchema = new mongoose.Schema({
         unique: true,
     }, 
     extraTypes: {
-        type: Object
+        type: Array
     },
     type: {
         type: String,

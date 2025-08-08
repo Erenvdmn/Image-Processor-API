@@ -146,14 +146,13 @@ app.post('/convert-type', async (request, response) =>{
         const oldFilename = existingImage.filename;
         const oldPath = path.resolve('images', oldFilename);
         const baseName = oldFilename.substring(0, oldFilename.lastIndexOf("."));
+        const oldPathName = oldFilename.substring(oldFilename.lastIndexOf(".")).substring(1);
+        existingImage.extraTypes.push(oldPathName);
+        existingImage.extraTypes.push(newType);
         const newFilename = `${baseName}.${newType}`;
         const newPath = path.resolve('images', newFilename);
 
         await sharp(oldPath).toFormat(newType).toFile(newPath);
-
-        if (fs.existsSync(oldPath)) {
-            fs.unlinkSync(oldPath);
-        }
 
         existingImage.type = newType;
         existingImage.filename = newFilename;
@@ -191,15 +190,11 @@ app.post('/change-size', async (request, response) => {
 
         const fileName = image.filename;
         const oldPath = path.resolve('images', fileName);
-        const tempPath = path.resolve('images', 'temp_' + fileName);
+        const newPath = path.resolve('images', 'resized__' + fileName);
 
         await sharp(oldPath)
         .resize(widthInt, heightInt)
-        .toFile(tempPath);
-
-        fs.unlinkSync(oldPath);
-
-        fs.renameSync(tempPath, oldPath);
+        .toFile(newPath);
 
 
         image.width = width;
