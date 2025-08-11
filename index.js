@@ -16,7 +16,7 @@ const PORT = 5000;
 const app = express();
 app.use(cors());
 
-app.use(express.json());
+
 
 mongoose.connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
@@ -81,7 +81,6 @@ app.post('/upload', (request, response) => {
     });
 });
 
-
 // Get All Images
 app.get('/media', async(request, response) => {
     try {
@@ -134,7 +133,7 @@ app.get('/image/:id', async (request, response) => {
 });
 
 // Converting Images Types
-app.post('/convert-type', async (request, response) =>{
+app.post('/convert-type', express.json(), async (request, response) =>{
     const { id, newType } = request.body;
 
     try {
@@ -168,7 +167,7 @@ app.post('/convert-type', async (request, response) =>{
 });
 
 // Changing Image's Size
-app.post('/change-size', async (request, response) => {
+app.post('/change-size',express.json(), async (request, response) => {
     const { id, width, height } = request.body;
 
     if (!id || !width || !height) {
