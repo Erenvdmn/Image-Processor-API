@@ -15,7 +15,6 @@ const imageSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        required: true
     },
     size: {
         type: String,

@@ -1,5 +1,5 @@
 import express from 'express';
-import mongoose, { mongo } from 'mongoose';
+import mongoose from 'mongoose';
 import cors from "cors";
 import dotenv from 'dotenv';
 import sharp from 'sharp';
@@ -40,6 +40,18 @@ var storage = multer.diskStorage({
 
 var upload = multer({ storage: storage}).single('file');
 
+var storageWM = multer.diskStorage({
+    destination: function (request, file, callback) {
+        callback(null, './watermarks');
+    },
+    filename: function (request, file, callback) {
+        console.log("file:", file);
+        callback(null, 'watermark' + '.png');
+    }
+});
+
+var uploadWM = multer({ storage: storageWM }).single('file');
+
 
 // Uploading Images
 app.post('/upload', (request, response) => {
@@ -79,6 +91,96 @@ app.post('/upload', (request, response) => {
             return response.status(200).json({ message: "Error processing image", done: false });
         }
     });
+});
+
+// Uploading Watermarks
+app.post('/uploadWM', (request, response) => {
+  uploadWM(request, response, async (error) => {
+    if (error || !request.file) {
+      console.error(error);
+      return response.status(200).json({ message: "Error uploading watermark.", done: false });
+    }
+    try {
+      return response.status(200).json({ message: "Watermark saved", done: true });
+    } catch (err) {
+      console.error("Error saving watermark", err);
+      return response.status(200).json({ message: "Error saving watermark", done: false });
+    }
+  });
+});
+
+// Apply watermark and Edit the Image
+app.post('/apply-watermark-and-edit', express.json(), async (request, response) => {
+  const { id, width, height, type } = request.body;
+
+  if (!id || !width || !height) {
+    return response.status(200).json({ message: "fill all the entries", done: false });
+  }
+
+  const widthInt = parseInt(width);
+  const heightInt = parseInt(height);
+
+  try {
+    const original = await Image.findById(id);
+    if (!original) {
+      return response.status(200).json({ message: "Image not found", done: false });
+    }
+
+    var oldPathType = original.filename.substring(original.filename.lastIndexOf(".")).substring(1);
+
+    original.extraTypes.push(oldPathType);
+    original.extraTypes.push(type);
+
+    await original.save();
+
+    const oldPath = path.resolve('images', original.filename);
+    const watermarkPath = path.resolve('watermarks', 'watermark.png');
+
+    const lastDot = original.filename.lastIndexOf('.');
+    const baseName = lastDot > 0 ? original.filename.substring(0, lastDot) : original.filename;
+
+    if (!fs.existsSync(watermarkPath)) {
+        var newFileName = `resized-${baseName}.${type}`;
+        var newPath = path.resolve('images', newFileName);
+
+        await sharp(oldPath)
+        .resize(widthInt, heightInt).toFormat(type)
+        .toFile(newPath);
+    } else {
+        var newFileName = `watermarked-${baseName}.${original.type}`;
+        var newPath = path.resolve('images', newFileName);
+
+        await sharp(oldPath)
+        .resize(widthInt, heightInt)
+        .composite([{ input: watermarkPath, gravity: 'southeast' }]).toFormat(type)
+        .toFile(newPath);
+    }
+
+
+    try { fs.unlinkSync(watermarkPath); } catch (_) {}
+
+    const meta = await sharp(newPath).metadata();
+    const stats = fs.statSync(newPath);
+
+
+    const newImage = new Image({
+      type: type,
+      size: String(stats.size),
+      width: meta.width,
+      height: meta.height,
+      extraTypes: [],
+      filename: newFileName
+    });
+
+    await newImage.save();
+    newImage.path = `http://192.168.0.250:${PORT}/image/${newImage._id}`;
+    await newImage.save();
+
+    return response.status(200).json({ message: "Watermark applied", image: newImage, done: true });
+  } catch (error) {
+    console.error("apply-watermark error:", error);
+    return response.status(200).json({ message: "Error applying watermark", done: false });
+  }
 });
 
 // Get All Images
@@ -131,82 +233,6 @@ app.get('/image/:id', async (request, response) => {
         return response.status(200).json({ message: "Error rendering image", done: false});
     }
 });
-
-// Converting Images Types
-app.post('/convert-type', express.json(), async (request, response) =>{
-    const { id, newType } = request.body;
-
-    try {
-        const existingImage = await Image.findById(id);
-        if (!existingImage) {
-            return response.status(200).json({ message: "Image yok", done: false });
-        }
-
-        const oldFilename = existingImage.filename;
-        const oldPath = path.resolve('images', oldFilename);
-        const baseName = oldFilename.substring(0, oldFilename.lastIndexOf("."));
-        const oldPathName = oldFilename.substring(oldFilename.lastIndexOf(".")).substring(1);
-        existingImage.extraTypes.push(oldPathName);
-        existingImage.extraTypes.push(newType);
-        const newFilename = `${baseName}.${newType}`;
-        const newPath = path.resolve('images', newFilename);
-
-        await sharp(oldPath).toFormat(newType).toFile(newPath);
-
-        existingImage.type = newType;
-        existingImage.filename = newFilename;
-        await existingImage.save();
-
-        return response.status(200).json({ message: "Image converted and updated successfully", done: true});
-        
-    } catch (error) {
-        return response.status(200).json({ message: "Error while updating image", done: false});
-    }
-
-    
-});
-
-// Changing Image's Size
-app.post('/change-size',express.json(), async (request, response) => {
-    const { id, width, height } = request.body;
-
-    if (!id || !width || !height) {
-        return response.status(200).json({ message: "fill all the entries", done: false });
-    } 
-
-    const widthInt = parseInt(width);
-    const heightInt = parseInt(height);
-
-    try {
-        console.log("ID:", id);
-
-        const image = await Image.findById(id);
-        console.log("Image from DB:", image);
-
-        if (!image) {
-            return response.status(200).json({ message: "Image not found", done: false });
-        }
-
-        const fileName = image.filename;
-        const oldPath = path.resolve('images', fileName);
-        const newPath = path.resolve('images', 'resized__' + fileName);
-
-        await sharp(oldPath)
-        .resize(widthInt, heightInt)
-        .toFile(newPath);
-
-
-        image.width = width;
-        image.height = height;
-        await image.save();
-
-        return response.status(200).json({ message: "Image resized successfully", done: true });
-    } catch (error) {
-        console.error("Error:", error);
-        return response.status(200).json({ message: "Error while changing image size", done: false });
-    }
-});
-
 
 app.listen(PORT, async () => {
     console.log(`Server is running on port ${PORT}`)
