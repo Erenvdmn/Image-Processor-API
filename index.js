@@ -234,6 +234,31 @@ app.get('/image/:id', async (request, response) => {
     }
 });
 
+// Deleting images
+app.post('/delete/:id', async (request, response) => {
+    const { id } = request.params;
+
+    try {
+        const existingImage = await Image.findById(id);
+        const imageName = existingImage.filename;
+        const deleted = await Image.findByIdAndDelete(id);
+
+        if (!deleted) {
+            return response.status(200).json({ message: "can't find the image", done: false})
+        }
+
+       if (fs.existsSync(`./images/${imageName}`)) {
+            try { fs.unlinkSync(`./images/${imageName}`); } catch (err) {
+                console.error("File delete error", err);
+            }
+        }
+
+        return response.status(200).json({ message: "image deleted", done: true })
+    } catch (error) {
+        return response.status(200).json({ message: "can't delete the image", error, done: false })
+    }
+});
+
 app.listen(PORT, async () => {
     console.log(`Server is running on port ${PORT}`)
 })
