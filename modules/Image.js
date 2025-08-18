@@ -11,10 +11,13 @@ const imageSchema = new mongoose.Schema({
         unique: true,
     }, 
     extraTypes: {
-        type: Array
+        type: [String],
+        set: function(arr) {
+            return [...new Set(arr)]
+        }
     },
     type: {
-        type: String,
+        type: String
     },
     size: {
         type: String,
@@ -27,6 +30,9 @@ const imageSchema = new mongoose.Schema({
     height: {
         type: Number,
         required: true,
+    },
+    tag: {
+        type: String
     }
 });
 

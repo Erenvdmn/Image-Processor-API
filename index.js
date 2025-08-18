@@ -65,6 +65,7 @@ app.post('/upload', (request, response) => {
             const imagePath = request.file.path;
 
             const filename = request.file.filename;
+            const tag = request.body.tag;
 
             const metadata = await sharp(imagePath).metadata();
 
@@ -74,7 +75,8 @@ app.post('/upload', (request, response) => {
                 width: metadata.width,
                 height: metadata.height,
                 extraTypes: [],
-                filename: filename
+                filename: filename,
+                tag: tag
             });
 
             await image.save();
@@ -111,9 +113,9 @@ app.post('/uploadWM', (request, response) => {
 
 // Apply watermark and Edit the Image
 app.post('/apply-watermark-and-edit', express.json(), async (request, response) => {
-  const { id, width, height, type } = request.body;
+  const { id, width, height, type, tag } = request.body;
 
-  if (!id || !width || !height) {
+  if (!id || !width || !height || !tag) {
     return response.status(200).json({ message: "fill all the entries", done: false });
   }
 
@@ -169,7 +171,8 @@ app.post('/apply-watermark-and-edit', express.json(), async (request, response) 
       width: meta.width,
       height: meta.height,
       extraTypes: [],
-      filename: newFileName
+      filename: newFileName,
+      tag: tag
     });
 
     await newImage.save();
